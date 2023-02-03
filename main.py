@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+
 
 
 class AgeImputer(BaseEstimator, TransformerMixin):
@@ -55,9 +57,6 @@ pipeline = Pipeline([("ageimputer", AgeImputer()),
                     ])
 
 
-
-sns.heatmap(titanic_data.corr(), cmap='YlGnBu')
-
 split = StratifiedShuffleSplit(n_splits=1, test_size=0.2)
 
 for train_indices, test_indices in split.split(titanic_data, titanic_data[["Survived", "Pclass", "Sex"]]):
@@ -75,12 +74,55 @@ X_data = scaler.fit_transform(X)
 y_data = y.to_numpy()
 
 
-# plt.subplot(1,2,1)
-# strat_train_set['Survived'].hist()
-# strat_train_set['Pclass'].hist()
+clf = RandomForestClassifier()
+param_grid = [
+    {"n_estimators": [10, 100, 200, 500], "max_depth": [None, 5, 10], "min_samples_split": [2,3,4]}
+]
 
-# plt.subplot(1,2,2)
-# strat_test_set['Survived'].hist()
-# strat_test_set['Pclass'].hist()
+grid_search = GridSearchCV(clf, param_grid, cv=3, scoring="accuracy", return_train_score=True)
+grid_search.fit(X_data, y_data)
 
-# plt.show()
+final_clf = grid_search.best_estimator_
+
+strat_test_set = pipeline.fit_transform(strat_test_set)
+X_test = strat_test_set.drop(['Survived'], axis=1)
+y_test = strat_test_set['Survived']
+
+scaler = StandardScaler()
+X_data_test = scaler.fit_transform(X_test)
+y_data_test = y_test.to_numpy()
+
+print(final_clf.score(X_data_test, y_data_test))
+
+final_data = pipeline.fit_transform(titanic_data)
+
+X_final = final_data.drop(['Survived'], axis=1)
+y_final = final_data['Survived']
+
+scaler = StandardScaler()
+X_data_final = scaler.fit_transform(X_final)
+y_data_final = y_final.to_numpy()
+
+prod_clf = RandomForestClassifier()
+param_grid = [
+    {"n_estimators": [10, 100, 200, 500], "max_depth": [None, 5, 10], "min_samples_split": [2,3,4]}
+]
+
+grid_search = GridSearchCV(prod_clf, param_grid, cv=3, scoring="accuracy", return_train_score=True)
+grid_search.fit(X_data_final, y_data_final)
+
+prod_final_clf = grid_search.best_estimator_
+
+titanic_test_data = pd.read_csv("data/test.csv")
+final_test_data = pipeline.fit_transform(titanic_test_data)
+X_final_test = final_test_data
+X_final_test = X_final_test.fillna(method="ffill")
+
+scaler = StandardScaler()
+X_data_final_test = scaler.fit_transform(X_final_test)
+
+predictions = prod_final_clf.predict(X_data_final_test)
+
+final_df = pd.DataFrame(titanic_test_data['PassengerId'])
+final_df['Survived'] = predictions
+final_df.to_csv("data/predictions.csv", index=False)
