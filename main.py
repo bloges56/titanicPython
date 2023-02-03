@@ -5,8 +5,9 @@ import seaborn as sns
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
+
 
 class AgeImputer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
@@ -30,7 +31,7 @@ class FeatureEncoder(BaseEstimator, TransformerMixin):
         for i in range(len(matrix.T)):
             X[column_names[i]] = matrix.T[i]
 
-        matrix = encoder.fit_transform(X[[+'Sex']]).toarray()
+        matrix = encoder.fit_transform(X[['Sex']]).toarray()
 
         column_names = ["Female", "Male"]
 
@@ -48,9 +49,9 @@ class FeatureDropper(BaseEstimator, TransformerMixin):
 
 titanic_data = pd.read_csv('data/train.csv')
 
-pipeline = Pipeline(["ageimputer", AgeImputer(),
-                      "featureencoder", FeatureEncoder(),
-                      "featuredropper", FeatureDropper()             
+pipeline = Pipeline([("ageimputer", AgeImputer()),
+                      ("featureencoder", FeatureEncoder()),
+                      ("featuredropper", FeatureDropper())             
                     ])
 
 
@@ -65,7 +66,14 @@ for train_indices, test_indices in split.split(titanic_data, titanic_data[["Surv
 
 strat_train_set = pipeline.fit_transform(strat_train_set)
 
-print(strat_train_set)
+X = strat_train_set.drop(['Survived'], axis=1)
+y = strat_train_set['Survived']
+
+
+scaler = StandardScaler()
+X_data = scaler.fit_transform(X)
+y_data = y.to_numpy()
+
 
 # plt.subplot(1,2,1)
 # strat_train_set['Survived'].hist()
